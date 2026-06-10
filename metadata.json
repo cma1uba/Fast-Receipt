@@ -1,0 +1,6 @@
+{
+  "name": "No-Fuss Receipt Grabber",
+  "description": "A privacy-first receipt extraction portal. Drop receipt screenshots to parse vendor, amount, tax, and category with Gemini, edit instantly, and batch export to CSV or Webhook.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
