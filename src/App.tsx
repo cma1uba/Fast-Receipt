@@ -90,6 +90,8 @@ export default function App() {
 
   const [startScreenTab, setStartScreenTab] = useState<"sessions" | "history">("sessions");
   const [viewingSavedLedger, setViewingSavedLedger] = useState<SavedLedger | null>(null);
+  const [deletingLedgerId, setDeletingLedgerId] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<BatchTask[]>([]);
   const [activeVerification, setActiveVerification] = useState<BatchTask | null>(null);
   const [dismissedTaskIds, setDismissedTaskIds] = useState<string[]>([]);
@@ -780,22 +782,47 @@ export default function App() {
                     </div>
 
                     {sessions.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const confirmDel = window.confirm(`Are you sure you want to permanently delete session "${session.name}" and all its receipts? This action is irreversible.`);
-                          if (confirmDel) {
-                            const updated = sessions.filter(s => s.id !== session.id);
-                            setSessions(updated);
-                            localStorage.setItem("nf_sessions", JSON.stringify(updated));
-                            localStorage.removeItem(`nf_receipt_ledger_${session.id}`);
-                          }
-                        }}
-                        className="p-1 opacity-0 group-hover:opacity-100 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-450 rounded-lg sm:rounded-xl transition-all cursor-pointer"
-                        title="Delete Session"
-                      >
-                        <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      </button>
+                      <div className="relative shrink-0 flex items-center">
+                        {deletingSessionId === session.id ? (
+                          <div className="flex items-center gap-1 bg-rose-50 dark:bg-rose-950/20 p-1 py-0.5 sm:p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/40 animate-in fade-in slide-in-from-top-1">
+                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-450 px-1 hidden sm:block">Delete Workspace?</span>
+                            <span className="text-[9px] font-bold text-rose-600 dark:text-rose-450 px-0.5 sm:hidden">Sure?</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const updated = sessions.filter(s => s.id !== session.id);
+                                setSessions(updated);
+                                localStorage.setItem("nf_sessions", JSON.stringify(updated));
+                                localStorage.removeItem(`nf_receipt_ledger_${session.id}`);
+                                setDeletingSessionId(null);
+                              }}
+                              className="px-1.5 py-0.5 bg-rose-600 dark:bg-rose-700 hover:bg-rose-700 dark:hover:bg-rose-650 text-white rounded text-[9px] font-extrabold transition-all cursor-pointer mr-0.5 shadow-3xs"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingSessionId(null);
+                              }}
+                              className="px-1.5 py-0.5 bg-slate-205 dark:bg-slate-805 hover:bg-slate-305 dark:hover:bg-slate-755 text-slate-705 dark:text-slate-305 rounded text-[9px] font-extrabold transition-all cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingSessionId(session.id);
+                            }}
+                            className="p-1 sm:p-1.5 opacity-0 group-hover:opacity-100 hover:bg-rose-50 dark:hover:bg-rose-950/25 text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-450 rounded-lg sm:rounded-xl transition-all cursor-pointer"
+                            title="Delete Session"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -925,18 +952,41 @@ export default function App() {
                               {ledger.saveName}
                             </h3>
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (window.confirm("Are you sure you want to permanently delete this saved ledger backup?")) {
-                                handleDeleteSavedLedger(ledger.id);
-                              }
-                            }}
-                            className="p-1 sm:p-1.5 text-slate-400 hover:text-rose-600 dark:text-slate-505 hover:bg-rose-50 dark:hover:bg-rose-955/20 rounded-xl transition-all cursor-pointer shrink-0"
-                            title="Delete saved ledger"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {deletingLedgerId === ledger.id ? (
+                            <div className="flex items-center gap-1.5 shrink-0 bg-rose-50 dark:bg-rose-955/20 p-1 rounded-xl border border-rose-200 dark:border-rose-900/40 animate-in fade-in slide-in-from-right-1 duration-150">
+                              <span className="text-[10px] font-bold text-rose-600 dark:text-rose-450 px-1">Delete?</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSavedLedger(ledger.id);
+                                  setDeletingLedgerId(null);
+                                }}
+                                className="px-1.5 py-0.5 bg-rose-600 dark:bg-rose-700 hover:bg-rose-700 dark:hover:bg-rose-650 text-white rounded text-[9px] font-extrabold transition-all cursor-pointer shadow-3xs"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingLedgerId(null);
+                                }}
+                                className="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-705 dark:text-slate-305 rounded text-[9px] font-extrabold transition-all cursor-pointer"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingLedgerId(ledger.id);
+                              }}
+                              className="p-1 sm:p-1.5 text-slate-400 hover:text-rose-600 dark:text-slate-505 hover:bg-rose-50 dark:hover:bg-rose-955/20 rounded-xl transition-all cursor-pointer shrink-0"
+                              title="Delete saved ledger"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
 
                         {/* Statistics Summary block */}
