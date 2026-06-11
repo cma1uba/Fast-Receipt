@@ -7,6 +7,7 @@ export interface ReceiptItem {
   name: string;
   quantity?: number;
   price: number;
+  category?: ExpenseCategory;
 }
 
 export interface ReceiptSession {

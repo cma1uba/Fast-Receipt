@@ -68,7 +68,7 @@ export default function VerificationMatrix({
   };
 
   const handleAddItem = () => {
-    setItems((prev) => [...prev, { name: "", quantity: 1, price: 0 }]);
+    setItems((prev) => [...prev, { name: "", quantity: 1, price: 0, category: "Other" }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -394,7 +394,7 @@ export default function VerificationMatrix({
               ) : (
                 <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
                   {items.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2 bg-white dark:bg-slate-900/40 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-3xs font-sans animate-in fade-in slide-in-from-top-1">
+                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-3xs font-sans animate-in fade-in slide-in-from-top-1">
                       {/* Name input */}
                       <input
                         type="text"
@@ -405,43 +405,59 @@ export default function VerificationMatrix({
                         required
                       />
 
-                      {/* Quantity input */}
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="Qty"
-                        value={item.quantity || 1}
-                        onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                        className="w-11 bg-slate-50 dark:bg-slate-950 p-1 rounded-md border border-slate-200 dark:border-slate-800 text-xs text-slate-705 dark:text-slate-300 font-mono text-center outline-none focus:ring-1 focus:ring-blue-500/20"
-                        title="Quantity"
-                      />
+                      <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-between sm:justify-start">
+                        {/* Item-specific Category select */}
+                        <select
+                          value={item.category || "Other"}
+                          onChange={(e) => handleItemChange(index, "category", e.target.value)}
+                          className="w-28 bg-slate-50 dark:bg-slate-950 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 text-[10px] sm:text-xs text-slate-705 dark:text-slate-300 font-semibold outline-none focus:ring-1 focus:ring-blue-500/20 shrink-0 cursor-pointer"
+                          title="Item custom category"
+                        >
+                          {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
 
-                      {/* Price input */}
-                      <div className="relative w-20 shrink-0">
-                        <span className="absolute left-1.5 top-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-bold font-sans">
-                          $
-                        </span>
+                        {/* Quantity input */}
                         <input
                           type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.price !== undefined ? item.price : ""}
-                          onChange={(e) => handleItemChange(index, "price", e.target.value)}
-                          className="w-full bg-slate-50 dark:bg-slate-950 pl-4 pr-1.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200 font-mono text-right outline-none focus:ring-1 focus:ring-blue-500/20"
-                          title="Item total/price"
-                          required
+                          min="1"
+                          placeholder="Qty"
+                          value={item.quantity || 1}
+                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                          className="w-11 bg-slate-50 dark:bg-slate-950 p-1 rounded-md border border-slate-200 dark:border-slate-800 text-xs text-slate-705 dark:text-slate-300 font-mono text-center outline-none focus:ring-1 focus:ring-blue-500/20"
+                          title="Quantity"
                         />
-                      </div>
 
-                      {/* Trash action button */}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(index)}
-                        className="p-1 text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors shrink-0"
-                        title="Remove item"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        {/* Price input */}
+                        <div className="relative w-20 shrink-0">
+                          <span className="absolute left-1.5 top-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-bold font-sans">
+                            $
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={item.price !== undefined ? item.price : ""}
+                            onChange={(e) => handleItemChange(index, "price", e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-950 pl-4 pr-1.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200 font-mono text-right outline-none focus:ring-1 focus:ring-blue-500/20"
+                            title="Item total/price"
+                            required
+                          />
+                        </div>
+
+                        {/* Trash action button */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(index)}
+                          className="p-1 text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors shrink-0"
+                          title="Remove item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

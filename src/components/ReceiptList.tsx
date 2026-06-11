@@ -171,7 +171,9 @@ export default function ReceiptList({
       r.rawNotes.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.amount.toString().includes(searchTerm);
 
-    const matchesCategory = selectedCategory === "All" || r.category === selectedCategory;
+    const matchesCategory = selectedCategory === "All" || 
+      r.category === selectedCategory ||
+      (r.items && r.items.some((item) => item.category === selectedCategory));
 
     return matchesSearch && matchesCategory;
   }).sort((a, b) => {
@@ -394,8 +396,12 @@ export default function ReceiptList({
                   {receipts.length}
                 </span>
               </button>
-              {categories.filter((cat) => receipts.some((r) => r.category === cat)).map((cat) => {
-                const countOfCat = receipts.filter((r) => r.category === cat).length;
+              {categories.filter((cat) => 
+                receipts.some((r) => r.category === cat || (r.items && r.items.some((item) => item.category === cat)))
+              ).map((cat) => {
+                const countOfCat = receipts.filter((r) => 
+                  r.category === cat || (r.items && r.items.some((item) => item.category === cat))
+                ).length;
                 return (
                   <button
                     key={cat}
@@ -764,27 +770,39 @@ export default function ReceiptList({
                               ) : (
                                 <div className="space-y-2">
                                   <div className="grid grid-cols-12 gap-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 pb-1 border-b border-slate-100 dark:border-slate-800 select-none">
-                                    <div className="col-span-6 font-sans truncate">Item</div>
-                                    <div className="col-span-2 text-center font-sans truncate">Qty</div>
-                                    <div className="col-span-2 text-right font-sans font-medium truncate">Price</div>
-                                    <div className="col-span-2 text-right font-sans font-bold text-slate-900 dark:text-slate-200 truncate">Total</div>
+                                    <div className="col-span-12 sm:col-span-5 font-sans truncate">Item</div>
+                                    <div className="hidden sm:block sm:col-span-3 text-left font-sans truncate">Category</div>
+                                    <div className="col-span-4 sm:col-span-1 text-center font-sans truncate">Qty</div>
+                                    <div className="col-span-4 sm:col-span-1.5 text-right font-sans font-medium truncate">Price</div>
+                                    <div className="col-span-4 sm:col-span-1.5 text-right font-sans font-bold text-slate-900 dark:text-slate-200 truncate">Total</div>
                                   </div>
 
                                   <div className="divide-y divide-slate-100 dark:divide-slate-805">
                                     {r.items.map((item, idx) => {
                                       const rowSymbol = CURRENCY_SYMBOLS[r.currency || "USD"] || "$";
                                       return (
-                                        <div key={idx} className="grid grid-cols-12 gap-1.5 py-1.5 text-[11px] text-slate-705 dark:text-slate-300 items-center hover:bg-slate-50/40 dark:hover:bg-slate-900/40 rounded px-0.5 transition-colors">
-                                          <div className="col-span-6 font-semibold text-slate-800 dark:text-slate-200 truncate" title={item.name}>
-                                            {item.name}
+                                        <div key={idx} className="grid grid-cols-12 gap-1.5 py-2 text-[11px] text-slate-705 dark:text-slate-300 items-start sm:items-center hover:bg-slate-50/40 dark:hover:bg-slate-900/40 rounded px-0.5 transition-colors">
+                                          <div className="col-span-12 sm:col-span-5 flex flex-col gap-0.5 justify-center min-w-0">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={item.name}>
+                                              {item.name}
+                                            </span>
+                                            {/* Mobile category badge */}
+                                            <span className="block sm:hidden self-start px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 mt-1 whitespace-nowrap">
+                                              {item.category || "Other"}
+                                            </span>
                                           </div>
-                                          <div className="col-span-2 text-center font-mono font-medium text-slate-500 dark:text-slate-400 text-[10px]">
+                                          <div className="hidden sm:block sm:col-span-3 text-left truncate">
+                                            <span className="px-2 py-0.5 rounded text-[9.5px] font-extrabold bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 tracking-wide uppercase">
+                                              {item.category || "Other"}
+                                            </span>
+                                          </div>
+                                          <div className="col-span-4 sm:col-span-1 text-center font-mono font-medium text-slate-500 dark:text-slate-400 text-[10px]">
                                             {item.quantity || 1}
                                           </div>
-                                          <div className="col-span-2 text-right font-mono text-slate-600 dark:text-slate-400">
+                                          <div className="col-span-4 sm:col-span-1.5 text-right font-mono text-slate-600 dark:text-slate-400">
                                             {rowSymbol}{item.price.toFixed(2)}
                                           </div>
-                                          <div className="col-span-2 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                                          <div className="col-span-4 sm:col-span-1.5 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
                                             {rowSymbol}{((item.price) * (item.quantity || 1)).toFixed(2)}
                                           </div>
                                         </div>
