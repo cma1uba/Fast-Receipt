@@ -12,7 +12,7 @@ import ReceiptList from "./components/ReceiptList";
 import { BatchTask, ReceiptData, SecuritySettings, ExpenseCategory, ReceiptSession, SavedLedger } from "./types";
 import { encryptData, decryptData, generateSessionPasscode } from "./utils/crypto";
 import { exportReceiptsToCSV } from "./utils/csv";
-import { initializePendo, trackPendoEvent } from "./lib/pendo";
+import { initializePendo, trackPendoEvent, NOVUS_APP_ID } from "./lib/pendo";
 import { Shield, Sparkles, Key, AlertTriangle, Layers, Info, Plus, Folder, Briefcase, User, Calendar, Trash2, Save, History, BookOpen, ExternalLink, Download } from "lucide-react";
 
 async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
@@ -43,16 +43,15 @@ export default function App() {
   // Pendo Novus AI Analytics Integration states
   const [pendoEnabled, setPendoEnabled] = useState<boolean>(() => {
     const saved = localStorage.getItem("nf_pendo_enabled");
-    if (saved !== null) {
-      return saved === "true";
-    }
-    const env = (import.meta as any).env;
-    return !!(env && env.VITE_PENDO_API_KEY);
+    // Default to enabled unless explicitly disabled by the user
+    if (saved === "false") return false;
+    return true;
   });
 
   const [pendoApiKey, setPendoApiKey] = useState<string>(() => {
     const env = (import.meta as any).env;
-    return localStorage.getItem("nf_pendo_api_key") || (env && env.VITE_PENDO_API_KEY) || "";
+    // Use saved key, env var, or fall back to the built-in Novus App ID
+    return localStorage.getItem("nf_pendo_api_key") || (env && env.VITE_PENDO_API_KEY) || NOVUS_APP_ID;
   });
 
   const [pendoActive, setPendoActive] = useState<boolean>(false);
@@ -73,7 +72,8 @@ export default function App() {
 
     if (pendoEnabled && pendoApiKey.trim()) {
       const visitorId = localStorage.getItem("nf_pendo_visitor_id") || "vstr_anon";
-      initializePendo(pendoApiKey.trim(), visitorId, `${visitorId}@novus.analytics.io`, "default_workspace");
+      const accountId = currentSessionId || "workspace_unselected";
+      initializePendo(pendoApiKey.trim(), visitorId, `${visitorId}@novus.analytics.io`, accountId);
       
       // Dynamic poll to detect window.pendo script load resolution
       const checkPendo = setInterval(() => {
@@ -87,7 +87,7 @@ export default function App() {
     } else {
       setPendoActive(false);
     }
-  }, [pendoEnabled, pendoApiKey]);
+  }, [pendoEnabled, pendoApiKey, currentSessionId]);
 
   const handleTriggerPendoTest = () => {
     trackPendoEvent("test_analytic_ping", {

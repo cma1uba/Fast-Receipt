@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Novus (Pendo) Application ID for No-Fuss Receipt Grabber
+export const NOVUS_APP_ID = "6251942177341440";
+
 // Define safe Pendo types
 declare global {
   interface Window {
