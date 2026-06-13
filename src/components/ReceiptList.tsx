@@ -223,6 +223,12 @@ export default function ReceiptList({
   };
 
   const confirmBulkDelete = () => {
+    pendo.track("bulk_receipts_deleted", {
+      deletedCount: selectedIds.size,
+      remainingCount: receipts.length - selectedIds.size,
+      totalLedgerSizeBefore: receipts.length,
+    });
+
     onDeleteReceipts(Array.from(selectedIds));
     setSelectedIds(new Set());
     setIsSelectMode(false);
@@ -231,6 +237,12 @@ export default function ReceiptList({
 
   const handleBulkCategoryChange = (category: ExpenseCategory) => {
     if (selectedIds.size === 0) return;
+
+    pendo.track("bulk_category_updated", {
+      updatedCount: selectedIds.size,
+      newCategory: category,
+    });
+
     onUpdateReceiptsCategory(Array.from(selectedIds), category);
     setSelectedIds(new Set());
     setIsSelectMode(false);

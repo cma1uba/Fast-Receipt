@@ -329,6 +329,13 @@ export default function App() {
 
   // Trigger manual security controls changes
   const handleSecurityChange = async (newSec: SecuritySettings) => {
+    pendo.track("security_settings_changed", {
+      encryptStorage: newSec.encryptStorage,
+      autoShredDelayMs: newSec.autoShredDelayMs,
+      previousEncryptStorage: security.encryptStorage,
+      previousAutoShredDelayMs: security.autoShredDelayMs,
+    });
+
     setSecurity(newSec);
     // Save settings right away
     await saveStateToStorage(receipts, newSec, passcode);
@@ -368,6 +375,15 @@ export default function App() {
     };
 
     setSavedLedgers(prev => [newSaved, ...prev]);
+
+    pendo.track("ledger_snapshot_saved", {
+      saveName: saveName.trim(),
+      sessionId: currentSessionId || "",
+      sessionName: currentSession?.name || "Unknown Session",
+      receiptCount: receipts.length,
+      totalAmount,
+      totalTax,
+    });
   };
 
   const handleRestoreLedger = async (ledger: SavedLedger) => {
@@ -400,9 +416,28 @@ export default function App() {
     setCurrentSessionId(newId);
     setReceipts(ledger.receipts);
     setViewingSavedLedger(null); // safely close modal if open
+
+    pendo.track("ledger_restored", {
+      saveName: ledger.saveName,
+      sourceSessionName: ledger.sessionName,
+      receiptCount: ledger.receipts.length,
+      totalAmount: ledger.totalAmount,
+      totalTax: ledger.totalTax,
+      newSessionId: newId,
+      isEncrypted: security.encryptStorage,
+    });
   };
 
   const handleDeleteSavedLedger = (id: string) => {
+    const ledger = savedLedgers.find(l => l.id === id);
+    if (ledger) {
+      pendo.track("saved_ledger_deleted", {
+        ledgerId: id,
+        saveName: ledger.saveName,
+        receiptCount: ledger.itemCount,
+        totalAmount: ledger.totalAmount,
+      });
+    }
     setSavedLedgers(prev => prev.filter(l => l.id !== id));
   };
 
@@ -426,6 +461,15 @@ export default function App() {
 
   // Handle addition of multiple files to the process batch queue
   const handleAddFiles = (files: File[]) => {
+    const fileTypes = [...new Set(files.map((f) => f.type))];
+    const totalFileSize = files.reduce((sum, f) => sum + f.size, 0);
+
+    pendo.track("receipt_images_uploaded", {
+      fileCount: files.length,
+      totalFileSize,
+      fileTypes: fileTypes.join(", "),
+    });
+
     const newTasks = files.map((file) => {
       const task: BatchTask = {
         id: crypto.randomUUID(),
@@ -486,11 +530,32 @@ export default function App() {
           items: Array.isArray(extractedPayload.items) ? extractedPayload.items : [],
         },
       });
+
+      pendo.track("receipt_extraction_completed", {
+        fileName: task.fileName,
+        fileType: task.fileType,
+        fileSize: task.fileSize,
+        vendor: extractedPayload.vendor || "Unknown Vendor",
+        amount: typeof extractedPayload.amount === "number" ? extractedPayload.amount : 0,
+        tax: typeof extractedPayload.tax === "number" ? extractedPayload.tax : 0,
+        currency: extractedPayload.currency || "USD",
+        category: extractedPayload.category || "Other",
+        date: extractedPayload.date || "",
+        itemCount: Array.isArray(extractedPayload.items) ? extractedPayload.items.length : 0,
+        rawNotesLength: (extractedPayload.rawNotes || "").length,
+      });
     } catch (err: any) {
       console.error(`AI Extraction error for ${task.fileName}:`, err);
       updateTaskStatus(task.id, {
         status: "failed",
         error: err?.message || "Failed to parse receipt text content.",
+      });
+
+      pendo.track("receipt_extraction_failed", {
+        fileName: task.fileName,
+        fileType: task.fileType,
+        fileSize: task.fileSize,
+        errorMessage: (err?.message || "Failed to parse receipt text content.").substring(0, 200),
       });
     }
   };
@@ -511,6 +576,13 @@ export default function App() {
   const handleRetryTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
+
+    pendo.track("receipt_extraction_retried", {
+      fileName: task.fileName,
+      fileType: task.fileType,
+      taskId: task.id,
+      hadBase64Data: !!task.base64Data,
+    });
 
     // We can't easily re-access the file stream object immediately,
     // so we re-fetch from the stored base64 image or prompt failure
@@ -597,6 +669,16 @@ export default function App() {
 
   // Manual delete single item
   const handleDeleteReceipt = async (id: string) => {
+    const receipt = receipts.find((r) => r.id === id);
+    if (receipt) {
+      pendo.track("receipt_deleted", {
+        receiptId: id,
+        vendor: receipt.vendor,
+        amount: receipt.amount,
+        currency: receipt.currency,
+        category: receipt.category,
+      });
+    }
     const filtered = receipts.filter((r) => r.id !== id);
     setReceipts(filtered);
     await saveStateToStorage(filtered, security, passcode);
@@ -618,6 +700,12 @@ export default function App() {
   const handleWipeData = async () => {
     const confirmWipe = window.confirm("⚠️ Are you absolutely sure you want to securely shred all sessions & local storage caches? This cannot be undone.");
     if (!confirmWipe) return;
+
+    pendo.track("all_data_wiped", {
+      totalSessionsWiped: sessions.length,
+      totalReceiptsWiped: receipts.length,
+      hadEncryption: security.encryptStorage,
+    });
 
     setReceipts([]);
     setTasks([]);
@@ -795,6 +883,13 @@ export default function App() {
                                 localStorage.setItem("nf_sessions", JSON.stringify(updated));
                                 localStorage.removeItem(`nf_receipt_ledger_${session.id}`);
                                 setDeletingSessionId(null);
+
+                                pendo.track("workspace_deleted", {
+                                  sessionId: session.id,
+                                  sessionName: session.name,
+                                  receiptCount: sessionCounts[session.id] ?? 0,
+                                  remainingSessionCount: updated.length,
+                                });
                               }}
                               className="px-1.5 py-0.5 bg-rose-600 dark:bg-rose-700 hover:bg-rose-700 dark:hover:bg-rose-650 text-white rounded text-[9px] font-extrabold transition-all cursor-pointer mr-0.5 shadow-3xs"
                             >
@@ -880,6 +975,12 @@ export default function App() {
                     setNewSessionName("");
                     setIsCreatingSession(false);
                     setCurrentSessionId(newId);
+
+                    pendo.track("workspace_created", {
+                      sessionName: trimmed,
+                      sessionId: newId,
+                      totalSessionCount: updated.length,
+                    });
                   }}
                   className="w-full space-y-1.5 sm:space-y-3.5 px-0.5 sm:px-1.5"
                 >
