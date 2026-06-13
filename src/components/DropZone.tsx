@@ -6,7 +6,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { UploadCloud, FileImage, Sparkles, X, RefreshCw, Check, AlertCircle, Camera, Clipboard, ClipboardCheck, Info } from "lucide-react";
 import { BatchTask } from "../types";
-import { trackPendoEvent } from "../lib/pendo";
 
 interface DropZoneProps {
   tasks: BatchTask[];
@@ -57,10 +56,6 @@ export default function DropZone({
         onAddFiles(imageFiles);
         setShowPasteToast(true);
         setTimeout(() => setShowPasteToast(false), 3000);
-        trackPendoEvent("clipboard_receipt_pasted", {
-          fileCount: imageFiles.length,
-          timestamp: new Date().toISOString(),
-        });
       }
     };
 
@@ -147,9 +142,6 @@ export default function DropZone({
                 type: "image/jpeg",
               });
               onAddFiles([file]);
-              trackPendoEvent("camera_receipt_captured", {
-                timestamp: new Date().toISOString(),
-              });
               stopCamera();
             }
           },

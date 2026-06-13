@@ -12,7 +12,6 @@ import ReceiptList from "./components/ReceiptList";
 import { BatchTask, ReceiptData, SecuritySettings, ExpenseCategory, ReceiptSession, SavedLedger } from "./types";
 import { encryptData, decryptData, generateSessionPasscode } from "./utils/crypto";
 import { exportReceiptsToCSV } from "./utils/csv";
-import { initializePendo, trackPendoEvent, NOVUS_APP_ID } from "./lib/pendo";
 import { Shield, Sparkles, Key, AlertTriangle, Layers, Info, Plus, Folder, Briefcase, User, Calendar, Trash2, Save, History, BookOpen, ExternalLink, Download } from "lucide-react";
 
 async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
@@ -39,41 +38,6 @@ export default function App() {
   });
 
   const [isPreLoading, setIsPreLoading] = useState<boolean>(true);
-
-  // Pendo Novus AI Analytics Integration states
-  const [pendoEnabled, setPendoEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem("nf_pendo_enabled");
-    // Default to enabled unless explicitly disabled by the user
-    if (saved === "false") return false;
-    return true;
-  });
-
-  const [pendoApiKey, setPendoApiKey] = useState<string>(() => {
-    const env = (import.meta as any).env;
-    // Use saved key, env var, or fall back to the built-in Novus App ID
-    return localStorage.getItem("nf_pendo_api_key") || (env && env.VITE_PENDO_API_KEY) || NOVUS_APP_ID;
-  });
-
-  const [pendoActive, setPendoActive] = useState<boolean>(false);
-
-  // Generate or load stable Visitor ID for Pendo tracking
-  useEffect(() => {
-    let visitorId = localStorage.getItem("nf_pendo_visitor_id");
-    if (!visitorId) {
-      visitorId = `vstr_${Math.random().toString(36).substring(2, 11)}`;
-      localStorage.setItem("nf_pendo_visitor_id", visitorId);
-    }
-  }, []);
-
-  const handleTriggerPendoTest = () => {
-    trackPendoEvent("test_analytic_ping", {
-      timestamp: new Date().toISOString(),
-      triggeredBy: "user_test_button",
-      ledgerItemCount: receipts.length,
-      activeSession: sessions.find(s => s.id === currentSessionId)?.name || "Default Sandbox",
-    });
-    alert("🚀 Pendo Novus AI Event Sent: 'test_analytic_ping' tracked successfully! (Check your console or the Pendo dashboard to verify).");
-  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -104,30 +68,6 @@ export default function App() {
   const [sessionCounts, setSessionCounts] = useState<Record<string, number>>({});
   const [newSessionName, setNewSessionName] = useState<string>("");
   const [isCreatingSession, setIsCreatingSession] = useState<boolean>(false);
-
-  // Save changes to localStorage and trigger Pendo Dynamic Initialization
-  useEffect(() => {
-    localStorage.setItem("nf_pendo_enabled", String(pendoEnabled));
-    localStorage.setItem("nf_pendo_api_key", pendoApiKey);
-
-    if (pendoEnabled && pendoApiKey.trim()) {
-      const visitorId = localStorage.getItem("nf_pendo_visitor_id") || "vstr_anon";
-      const accountId = currentSessionId || "workspace_unselected";
-      initializePendo(pendoApiKey.trim(), visitorId, `${visitorId}@novus.analytics.io`, accountId);
-      
-      // Dynamic poll to detect window.pendo script load resolution
-      const checkPendo = setInterval(() => {
-        if (typeof window !== "undefined" && window.pendo?.initialize) {
-          setPendoActive(true);
-          clearInterval(checkPendo);
-        }
-      }, 500);
-
-      return () => clearInterval(checkPendo);
-    } else {
-      setPendoActive(false);
-    }
-  }, [pendoEnabled, pendoApiKey, currentSessionId]);
 
   const [receipts, setReceipts] = useState<ReceiptData[]>([]);
 
@@ -392,12 +332,6 @@ export default function App() {
     setSecurity(newSec);
     // Save settings right away
     await saveStateToStorage(receipts, newSec, passcode);
-
-    trackPendoEvent("security_settings_changed", {
-      encryptStorage: newSec.encryptStorage,
-      autoShredDelayMs: newSec.autoShredDelayMs,
-      timestamp: new Date().toISOString(),
-    });
   };
 
   const handleRegeneratePasscode = async () => {
@@ -434,13 +368,6 @@ export default function App() {
     };
 
     setSavedLedgers(prev => [newSaved, ...prev]);
-
-    trackPendoEvent("ledger_snapshot_saved", {
-      saveName: saveName.trim(),
-      receiptCount: receipts.length,
-      sessionName: currentSession?.name || "Unknown Session",
-      timestamp: new Date().toISOString(),
-    });
   };
 
   const handleRestoreLedger = async (ledger: SavedLedger) => {
@@ -473,22 +400,9 @@ export default function App() {
     setCurrentSessionId(newId);
     setReceipts(ledger.receipts);
     setViewingSavedLedger(null); // safely close modal if open
-
-    trackPendoEvent("ledger_snapshot_restored", {
-      saveName: ledger.saveName,
-      receiptCount: ledger.receipts.length,
-      originalSession: ledger.sessionName,
-      timestamp: new Date().toISOString(),
-    });
   };
 
   const handleDeleteSavedLedger = (id: string) => {
-    const ledger = savedLedgers.find(l => l.id === id);
-    trackPendoEvent("saved_ledger_deleted", {
-      saveName: ledger?.saveName || id,
-      receiptCount: ledger?.itemCount || 0,
-      timestamp: new Date().toISOString(),
-    });
     setSavedLedgers(prev => prev.filter(l => l.id !== id));
   };
 
@@ -500,10 +414,6 @@ export default function App() {
 
     if (security.autoShredDelayMs > 0 && receipts.length > 0) {
       autoShredTimerRef.current = setTimeout(() => {
-        trackPendoEvent("auto_shred_triggered", {
-          autoShredDelayMs: security.autoShredDelayMs,
-          timestamp: new Date().toISOString(),
-        });
         handleWipeData();
         alert("🔒 No-Fuss Privacy Notice: Your local offline history cache has been automatically shredded according to your security configuration!");
       }, security.autoShredDelayMs);
@@ -531,12 +441,6 @@ export default function App() {
       triggerExtraction(task, file);
       
       return task;
-    });
-
-    trackPendoEvent("receipt_files_uploaded", {
-      fileCount: files.length,
-      fileTypes: files.map(f => f.type),
-      timestamp: new Date().toISOString(),
     });
 
     setTasks((prev) => [...prev, ...newTasks]);
@@ -582,26 +486,11 @@ export default function App() {
           items: Array.isArray(extractedPayload.items) ? extractedPayload.items : [],
         },
       });
-
-      trackPendoEvent("receipt_extraction_completed", {
-        vendor: extractedPayload.vendor || "Unknown Vendor",
-        category: extractedPayload.category || "Other",
-        currency: extractedPayload.currency || "USD",
-        itemCount: Array.isArray(extractedPayload.items) ? extractedPayload.items.length : 0,
-        fileName: task.fileName,
-        timestamp: new Date().toISOString(),
-      });
     } catch (err: any) {
       console.error(`AI Extraction error for ${task.fileName}:`, err);
       updateTaskStatus(task.id, {
         status: "failed",
         error: err?.message || "Failed to parse receipt text content.",
-      });
-
-      trackPendoEvent("receipt_extraction_failed", {
-        fileName: task.fileName,
-        error: err?.message || "Failed to parse receipt text content.",
-        timestamp: new Date().toISOString(),
       });
     }
   };
@@ -622,13 +511,6 @@ export default function App() {
   const handleRetryTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
-
-    trackPendoEvent("receipt_extraction_retried", {
-      taskId,
-      fileName: task.fileName,
-      hasBase64Data: !!task.base64Data,
-      timestamp: new Date().toISOString(),
-    });
 
     // We can't easily re-access the file stream object immediately,
     // so we re-fetch from the stored base64 image or prompt failure
@@ -697,15 +579,7 @@ export default function App() {
     // Clear verification views
     handleRemoveTask(taskId);
 
-    // Track the successful OCR extraction event in Pendo
-    trackPendoEvent("receipt_verified_and_saved", {
-      vendor: finalData.vendor,
-      amount: finalData.amount,
-      currency: finalData.currency,
-      category: finalData.category,
-      itemsCount: finalData.items?.length || 0,
-      timestamp: new Date().toISOString(),
-    });
+
   };
 
   const handleSelectTaskToVerify = (task: BatchTask) => {
@@ -726,37 +600,18 @@ export default function App() {
     const filtered = receipts.filter((r) => r.id !== id);
     setReceipts(filtered);
     await saveStateToStorage(filtered, security, passcode);
-
-    // Track state change in Pendo
-    trackPendoEvent("receipt_deleted", {
-      receiptId: id,
-      remainingCount: filtered.length,
-      timestamp: new Date().toISOString(),
-    });  };
+  };
 
   const handleDeleteReceipts = async (ids: string[]) => {
     const filtered = receipts.filter((r) => !ids.includes(r.id));
     setReceipts(filtered);
     await saveStateToStorage(filtered, security, passcode);
-
-    // Track dynamic batch delete event in Pendo
-    trackPendoEvent("bulk_receipts_deleted", {
-      deletedCount: ids.length,
-      remainingCount: filtered.length,
-      timestamp: new Date().toISOString(),
-    });
   };
 
   const handleUpdateReceiptsCategory = async (ids: string[], category: ExpenseCategory) => {
     const updated = receipts.map((r) => ids.includes(r.id) ? { ...r, category } : r);
     setReceipts(updated);
     await saveStateToStorage(updated, security, passcode);
-
-    trackPendoEvent("bulk_category_updated", {
-      updatedCount: ids.length,
-      newCategory: category,
-      timestamp: new Date().toISOString(),
-    });
   };
 
   // Full system clear state
@@ -768,11 +623,6 @@ export default function App() {
     setTasks([]);
     setActiveVerification(null);
     setDismissedTaskIds([]);
-
-    // Track full purge event in Pendo
-    trackPendoEvent("all_data_wiped", {
-      timestamp: new Date().toISOString(),
-    });
     
     // Clear all session storage keys
     for (const s of sessions) {
@@ -915,15 +765,7 @@ export default function App() {
               return (
                 <div
                   key={session.id}
-                  onClick={() => {
-                    setCurrentSessionId(session.id);
-                    trackPendoEvent("workspace_selected", {
-                      workspaceName: session.name,
-                      receiptCount: sessionCounts[session.id] ?? 0,
-                      totalWorkspaces: sessions.length,
-                      timestamp: new Date().toISOString(),
-                    });
-                  }}
+                  onClick={() => setCurrentSessionId(session.id)}
                   className="group relative bg-white dark:bg-[#0b1220]/72 backdrop-blur-md border border-slate-205 dark:border-[#1e2a3e]/80 rounded-xl sm:rounded-2xl p-2 sm:p-6.5 shadow-sm hover:shadow-xl hover:border-[#00A3FF] dark:hover:border-[#00A3FF]/85 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[110px] sm:min-h-[190px]"
                 >
                   <div className="flex justify-between items-start">
@@ -953,10 +795,6 @@ export default function App() {
                                 localStorage.setItem("nf_sessions", JSON.stringify(updated));
                                 localStorage.removeItem(`nf_receipt_ledger_${session.id}`);
                                 setDeletingSessionId(null);
-                                trackPendoEvent("workspace_deleted", {
-                                  workspaceName: session.name,
-                                  timestamp: new Date().toISOString(),
-                                });
                               }}
                               className="px-1.5 py-0.5 bg-rose-600 dark:bg-rose-700 hover:bg-rose-700 dark:hover:bg-rose-650 text-white rounded text-[9px] font-extrabold transition-all cursor-pointer mr-0.5 shadow-3xs"
                             >
@@ -1042,11 +880,6 @@ export default function App() {
                     setNewSessionName("");
                     setIsCreatingSession(false);
                     setCurrentSessionId(newId);
-                    trackPendoEvent("workspace_created", {
-                      workspaceName: trimmed,
-                      totalWorkspaces: updated.length,
-                      timestamp: new Date().toISOString(),
-                    });
                   }}
                   className="w-full space-y-1.5 sm:space-y-3.5 px-0.5 sm:px-1.5"
                 >
@@ -1180,29 +1013,13 @@ export default function App() {
 
                         <div className="flex items-center gap-1.5 ml-auto">
                           <button
-                            onClick={() => {
-                              setViewingSavedLedger(ledger);
-                              trackPendoEvent("saved_ledger_viewed", {
-                                saveName: ledger.saveName,
-                                receiptCount: ledger.itemCount,
-                                savedAt: ledger.savedAt,
-                                timestamp: new Date().toISOString(),
-                              });
-                            }}
+                            onClick={() => setViewingSavedLedger(ledger)}
                             className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#1a2333] dark:hover:bg-[#253247] text-slate-705 dark:text-slate-300 rounded-lg font-bold text-[9px] sm:text-[10.5px] transition-colors cursor-pointer"
                           >
                             View
                           </button>
                           <button
-                            onClick={() => {
-                              exportReceiptsToCSV(ledger.receipts, `${ledger.saveName.replace(/\s+/g, "_")}_export.csv`);
-                              trackPendoEvent("csv_export_completed", {
-                                source: "saved_ledger_card",
-                                saveName: ledger.saveName,
-                                receiptCount: ledger.receipts.length,
-                                timestamp: new Date().toISOString(),
-                              });
-                            }}
+                            onClick={() => exportReceiptsToCSV(ledger.receipts, `${ledger.saveName.replace(/\s+/g, "_")}_export.csv`)}
                             className="p-1 sm:p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-500/20 dark:border-emerald-500/30 transition-colors cursor-pointer"
                             title="Download CSV report"
                           >
@@ -1246,12 +1063,6 @@ export default function App() {
         onToggleDark={() => setIsDark(!isDark)}
         currentSessionName={sessions.find(s => s.id === currentSessionId)?.name || ""}
         onSwitchSession={() => setCurrentSessionId(null)}
-        pendoEnabled={pendoEnabled}
-        pendoApiKey={pendoApiKey}
-        onPendoToggle={setPendoEnabled}
-        onPendoKeyChange={setPendoApiKey}
-        onTriggerPendoTest={handleTriggerPendoTest}
-        pendoActive={pendoActive}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -1415,15 +1226,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  exportReceiptsToCSV(viewingSavedLedger.receipts, `${viewingSavedLedger.saveName.replace(/\s+/g, "_")}_export.csv`);
-                  trackPendoEvent("csv_export_completed", {
-                    source: "saved_ledger_modal",
-                    saveName: viewingSavedLedger.saveName,
-                    receiptCount: viewingSavedLedger.receipts.length,
-                    timestamp: new Date().toISOString(),
-                  });
-                }}
+                onClick={() => exportReceiptsToCSV(viewingSavedLedger.receipts, `${viewingSavedLedger.saveName.replace(/\s+/g, "_")}_export.csv`)}
                 className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 dark:border-emerald-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
