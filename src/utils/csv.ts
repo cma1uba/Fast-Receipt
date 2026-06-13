@@ -51,9 +51,4 @@ export function exportReceiptsToCSV(receipts: ReceiptData[], filename?: string) 
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(blobUrl);
-
-  pendo.track("csv_export_completed", {
-    receiptCount: receipts.length,
-    fileName: targetFilename,
-  });
 }
