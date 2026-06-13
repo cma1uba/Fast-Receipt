@@ -30,6 +30,16 @@ async function fileToBase64(file: File): Promise<{ base64: string; mimeType: str
   });
 }
 
+function trackPendoEvent(eventName: string, properties: Record<string, any> = {}) {
+  if (typeof pendo !== "undefined" && typeof pendo.track === "function") {
+    try {
+      pendo.track(eventName, properties);
+    } catch (err) {
+      console.warn("Pendo track failed for event:", eventName, err);
+    }
+  }
+}
+
 export default function App() {
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem("nf_theme_mode");
@@ -44,6 +54,10 @@ export default function App() {
       setIsPreLoading(false);
     }, 1800);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    trackPendoEvent("app_loaded", { theme: isDark ? "dark" : "light" });
   }, []);
 
   useEffect(() => {
@@ -455,6 +469,11 @@ export default function App() {
   // Perform AI parsing extraction sequence on the backend
   const triggerExtraction = async (task: BatchTask, file: File) => {
     updateTaskStatus(task.id, { status: "uploading" });
+    trackPendoEvent("receipt_extraction_started", {
+      fileName: task.fileName,
+      fileType: file.type,
+      fileSize: file.size,
+    });
 
     try {
       const { base64, mimeType } = await fileToBase64(file);
@@ -747,7 +766,11 @@ export default function App() {
             </div>
             
             <button
-              onClick={() => setIsDark(!isDark)}
+              onClick={() => {
+                const nextTheme = isDark ? "light" : "dark";
+                setIsDark(!isDark);
+                trackPendoEvent("theme_toggled", { theme: nextTheme });
+              }}
               className="p-2 border border-slate-200 dark:border-[#1e2a3e] rounded-xl hover:bg-slate-100 dark:hover:bg-[#0f172a] text-slate-500 dark:text-slate-400 cursor-pointer transition-all hover:scale-105"
             >
               {isDark ? <Sparkles className="w-4 h-4 text-amber-400" /> : <Shield className="w-4 h-4 text-[#00A3FF]" />}
