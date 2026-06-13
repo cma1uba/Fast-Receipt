@@ -392,6 +392,12 @@ export default function App() {
     setSecurity(newSec);
     // Save settings right away
     await saveStateToStorage(receipts, newSec, passcode);
+
+    trackPendoEvent("security_settings_changed", {
+      encryptStorage: newSec.encryptStorage,
+      autoShredDelayMs: newSec.autoShredDelayMs,
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const handleRegeneratePasscode = async () => {
@@ -428,6 +434,13 @@ export default function App() {
     };
 
     setSavedLedgers(prev => [newSaved, ...prev]);
+
+    trackPendoEvent("ledger_snapshot_saved", {
+      saveName: saveName.trim(),
+      receiptCount: receipts.length,
+      sessionName: currentSession?.name || "Unknown Session",
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const handleRestoreLedger = async (ledger: SavedLedger) => {
@@ -460,9 +473,22 @@ export default function App() {
     setCurrentSessionId(newId);
     setReceipts(ledger.receipts);
     setViewingSavedLedger(null); // safely close modal if open
+
+    trackPendoEvent("ledger_snapshot_restored", {
+      saveName: ledger.saveName,
+      receiptCount: ledger.receipts.length,
+      originalSession: ledger.sessionName,
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const handleDeleteSavedLedger = (id: string) => {
+    const ledger = savedLedgers.find(l => l.id === id);
+    trackPendoEvent("saved_ledger_deleted", {
+      saveName: ledger?.saveName || id,
+      receiptCount: ledger?.itemCount || 0,
+      timestamp: new Date().toISOString(),
+    });
     setSavedLedgers(prev => prev.filter(l => l.id !== id));
   };
 
@@ -474,6 +500,10 @@ export default function App() {
 
     if (security.autoShredDelayMs > 0 && receipts.length > 0) {
       autoShredTimerRef.current = setTimeout(() => {
+        trackPendoEvent("auto_shred_triggered", {
+          autoShredDelayMs: security.autoShredDelayMs,
+          timestamp: new Date().toISOString(),
+        });
         handleWipeData();
         alert("🔒 No-Fuss Privacy Notice: Your local offline history cache has been automatically shredded according to your security configuration!");
       }, security.autoShredDelayMs);
@@ -501,6 +531,12 @@ export default function App() {
       triggerExtraction(task, file);
       
       return task;
+    });
+
+    trackPendoEvent("receipt_files_uploaded", {
+      fileCount: files.length,
+      fileTypes: files.map(f => f.type),
+      timestamp: new Date().toISOString(),
     });
 
     setTasks((prev) => [...prev, ...newTasks]);
@@ -546,11 +582,26 @@ export default function App() {
           items: Array.isArray(extractedPayload.items) ? extractedPayload.items : [],
         },
       });
+
+      trackPendoEvent("receipt_extraction_completed", {
+        vendor: extractedPayload.vendor || "Unknown Vendor",
+        category: extractedPayload.category || "Other",
+        currency: extractedPayload.currency || "USD",
+        itemCount: Array.isArray(extractedPayload.items) ? extractedPayload.items.length : 0,
+        fileName: task.fileName,
+        timestamp: new Date().toISOString(),
+      });
     } catch (err: any) {
       console.error(`AI Extraction error for ${task.fileName}:`, err);
       updateTaskStatus(task.id, {
         status: "failed",
         error: err?.message || "Failed to parse receipt text content.",
+      });
+
+      trackPendoEvent("receipt_extraction_failed", {
+        fileName: task.fileName,
+        error: err?.message || "Failed to parse receipt text content.",
+        timestamp: new Date().toISOString(),
       });
     }
   };
@@ -571,6 +622,13 @@ export default function App() {
   const handleRetryTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
+
+    trackPendoEvent("receipt_extraction_retried", {
+      taskId,
+      fileName: task.fileName,
+      hasBase64Data: !!task.base64Data,
+      timestamp: new Date().toISOString(),
+    });
 
     // We can't easily re-access the file stream object immediately,
     // so we re-fetch from the stored base64 image or prompt failure
@@ -640,7 +698,7 @@ export default function App() {
     handleRemoveTask(taskId);
 
     // Track the successful OCR extraction event in Pendo
-    trackPendoEvent("receipt_extracted", {
+    trackPendoEvent("receipt_verified_and_saved", {
       vendor: finalData.vendor,
       amount: finalData.amount,
       currency: finalData.currency,
@@ -674,8 +732,7 @@ export default function App() {
       receiptId: id,
       remainingCount: filtered.length,
       timestamp: new Date().toISOString(),
-    });
-  };
+    });  };
 
   const handleDeleteReceipts = async (ids: string[]) => {
     const filtered = receipts.filter((r) => !ids.includes(r.id));
@@ -683,7 +740,7 @@ export default function App() {
     await saveStateToStorage(filtered, security, passcode);
 
     // Track dynamic batch delete event in Pendo
-    trackPendoEvent("multiple_receipts_deleted", {
+    trackPendoEvent("bulk_receipts_deleted", {
       deletedCount: ids.length,
       remainingCount: filtered.length,
       timestamp: new Date().toISOString(),
@@ -694,6 +751,12 @@ export default function App() {
     const updated = receipts.map((r) => ids.includes(r.id) ? { ...r, category } : r);
     setReceipts(updated);
     await saveStateToStorage(updated, security, passcode);
+
+    trackPendoEvent("bulk_category_updated", {
+      updatedCount: ids.length,
+      newCategory: category,
+      timestamp: new Date().toISOString(),
+    });
   };
 
   // Full system clear state
@@ -707,7 +770,7 @@ export default function App() {
     setDismissedTaskIds([]);
 
     // Track full purge event in Pendo
-    trackPendoEvent("ledger_fully_shredded", {
+    trackPendoEvent("all_data_wiped", {
       timestamp: new Date().toISOString(),
     });
     
@@ -852,7 +915,15 @@ export default function App() {
               return (
                 <div
                   key={session.id}
-                  onClick={() => setCurrentSessionId(session.id)}
+                  onClick={() => {
+                    setCurrentSessionId(session.id);
+                    trackPendoEvent("workspace_selected", {
+                      workspaceName: session.name,
+                      receiptCount: sessionCounts[session.id] ?? 0,
+                      totalWorkspaces: sessions.length,
+                      timestamp: new Date().toISOString(),
+                    });
+                  }}
                   className="group relative bg-white dark:bg-[#0b1220]/72 backdrop-blur-md border border-slate-205 dark:border-[#1e2a3e]/80 rounded-xl sm:rounded-2xl p-2 sm:p-6.5 shadow-sm hover:shadow-xl hover:border-[#00A3FF] dark:hover:border-[#00A3FF]/85 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[110px] sm:min-h-[190px]"
                 >
                   <div className="flex justify-between items-start">
@@ -882,6 +953,10 @@ export default function App() {
                                 localStorage.setItem("nf_sessions", JSON.stringify(updated));
                                 localStorage.removeItem(`nf_receipt_ledger_${session.id}`);
                                 setDeletingSessionId(null);
+                                trackPendoEvent("workspace_deleted", {
+                                  workspaceName: session.name,
+                                  timestamp: new Date().toISOString(),
+                                });
                               }}
                               className="px-1.5 py-0.5 bg-rose-600 dark:bg-rose-700 hover:bg-rose-700 dark:hover:bg-rose-650 text-white rounded text-[9px] font-extrabold transition-all cursor-pointer mr-0.5 shadow-3xs"
                             >
@@ -967,6 +1042,11 @@ export default function App() {
                     setNewSessionName("");
                     setIsCreatingSession(false);
                     setCurrentSessionId(newId);
+                    trackPendoEvent("workspace_created", {
+                      workspaceName: trimmed,
+                      totalWorkspaces: updated.length,
+                      timestamp: new Date().toISOString(),
+                    });
                   }}
                   className="w-full space-y-1.5 sm:space-y-3.5 px-0.5 sm:px-1.5"
                 >
@@ -1100,13 +1180,29 @@ export default function App() {
 
                         <div className="flex items-center gap-1.5 ml-auto">
                           <button
-                            onClick={() => setViewingSavedLedger(ledger)}
+                            onClick={() => {
+                              setViewingSavedLedger(ledger);
+                              trackPendoEvent("saved_ledger_viewed", {
+                                saveName: ledger.saveName,
+                                receiptCount: ledger.itemCount,
+                                savedAt: ledger.savedAt,
+                                timestamp: new Date().toISOString(),
+                              });
+                            }}
                             className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#1a2333] dark:hover:bg-[#253247] text-slate-705 dark:text-slate-300 rounded-lg font-bold text-[9px] sm:text-[10.5px] transition-colors cursor-pointer"
                           >
                             View
                           </button>
                           <button
-                            onClick={() => exportReceiptsToCSV(ledger.receipts, `${ledger.saveName.replace(/\s+/g, "_")}_export.csv`)}
+                            onClick={() => {
+                              exportReceiptsToCSV(ledger.receipts, `${ledger.saveName.replace(/\s+/g, "_")}_export.csv`);
+                              trackPendoEvent("csv_export_completed", {
+                                source: "saved_ledger_card",
+                                saveName: ledger.saveName,
+                                receiptCount: ledger.receipts.length,
+                                timestamp: new Date().toISOString(),
+                              });
+                            }}
                             className="p-1 sm:p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-500/20 dark:border-emerald-500/30 transition-colors cursor-pointer"
                             title="Download CSV report"
                           >
@@ -1319,7 +1415,15 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => exportReceiptsToCSV(viewingSavedLedger.receipts, `${viewingSavedLedger.saveName.replace(/\s+/g, "_")}_export.csv`)}
+                onClick={() => {
+                  exportReceiptsToCSV(viewingSavedLedger.receipts, `${viewingSavedLedger.saveName.replace(/\s+/g, "_")}_export.csv`);
+                  trackPendoEvent("csv_export_completed", {
+                    source: "saved_ledger_modal",
+                    saveName: viewingSavedLedger.saveName,
+                    receiptCount: viewingSavedLedger.receipts.length,
+                    timestamp: new Date().toISOString(),
+                  });
+                }}
                 className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 dark:border-emerald-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
