@@ -65,30 +65,6 @@ export default function App() {
     }
   }, []);
 
-  // Save changes to localStorage and trigger Pendo Dynamic Initialization
-  useEffect(() => {
-    localStorage.setItem("nf_pendo_enabled", String(pendoEnabled));
-    localStorage.setItem("nf_pendo_api_key", pendoApiKey);
-
-    if (pendoEnabled && pendoApiKey.trim()) {
-      const visitorId = localStorage.getItem("nf_pendo_visitor_id") || "vstr_anon";
-      const accountId = currentSessionId || "workspace_unselected";
-      initializePendo(pendoApiKey.trim(), visitorId, `${visitorId}@novus.analytics.io`, accountId);
-      
-      // Dynamic poll to detect window.pendo script load resolution
-      const checkPendo = setInterval(() => {
-        if (typeof window !== "undefined" && window.pendo?.initialize) {
-          setPendoActive(true);
-          clearInterval(checkPendo);
-        }
-      }, 500);
-
-      return () => clearInterval(checkPendo);
-    } else {
-      setPendoActive(false);
-    }
-  }, [pendoEnabled, pendoApiKey, currentSessionId]);
-
   const handleTriggerPendoTest = () => {
     trackPendoEvent("test_analytic_ping", {
       timestamp: new Date().toISOString(),
