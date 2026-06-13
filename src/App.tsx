@@ -329,6 +329,12 @@ export default function App() {
 
   // Trigger manual security controls changes
   const handleSecurityChange = async (newSec: SecuritySettings) => {
+    pendo.track("security_settings_changed", {
+      encryptStorage: newSec.encryptStorage,
+      autoShredDelayMs: newSec.autoShredDelayMs,
+      previousEncryptStorage: security.encryptStorage,
+      previousAutoShredDelayMs: security.autoShredDelayMs,
+    });
     setSecurity(newSec);
     // Save settings right away
     await saveStateToStorage(receipts, newSec, passcode);
@@ -367,6 +373,15 @@ export default function App() {
       itemCount: receipts.length,
     };
 
+    pendo.track("ledger_snapshot_saved", {
+      saveName: saveName.trim(),
+      receiptCount: receipts.length,
+      totalAmountUSD: Math.round(totalAmount * 100) / 100,
+      totalTaxUSD: Math.round(totalTax * 100) / 100,
+      sessionId: currentSessionId || "",
+      sessionName: currentSession?.name || "",
+    });
+
     setSavedLedgers(prev => [newSaved, ...prev]);
   };
 
@@ -396,6 +411,14 @@ export default function App() {
       localStorage.setItem(ledgerKey, JSON.stringify(ledger.receipts));
     }
     
+    pendo.track("ledger_snapshot_restored", {
+      ledgerId: ledger.id,
+      saveName: ledger.saveName,
+      receiptCount: ledger.receipts.length,
+      originalSessionName: ledger.sessionName,
+      newSessionId: newId,
+    });
+
     // Switch to restored session
     setCurrentSessionId(newId);
     setReceipts(ledger.receipts);
@@ -403,6 +426,13 @@ export default function App() {
   };
 
   const handleDeleteSavedLedger = (id: string) => {
+    const ledger = savedLedgers.find(l => l.id === id);
+    pendo.track("saved_ledger_deleted", {
+      ledgerId: id,
+      saveName: ledger?.saveName || "",
+      receiptCount: ledger?.itemCount || 0,
+      remainingLedgerCount: savedLedgers.length - 1,
+    });
     setSavedLedgers(prev => prev.filter(l => l.id !== id));
   };
 
@@ -414,6 +444,11 @@ export default function App() {
 
     if (security.autoShredDelayMs > 0 && receipts.length > 0) {
       autoShredTimerRef.current = setTimeout(() => {
+        pendo.track("auto_shred_triggered", {
+          autoShredDelayMs: security.autoShredDelayMs,
+          receiptCountShredded: receipts.length,
+          sessionId: currentSessionId || "",
+        });
         handleWipeData();
         alert("🔒 No-Fuss Privacy Notice: Your local offline history cache has been automatically shredded according to your security configuration!");
       }, security.autoShredDelayMs);
@@ -426,6 +461,13 @@ export default function App() {
 
   // Handle addition of multiple files to the process batch queue
   const handleAddFiles = (files: File[]) => {
+    pendo.track("receipt_files_uploaded", {
+      fileCount: files.length,
+      totalFileSize: files.reduce((sum, f) => sum + f.size, 0),
+      fileTypes: [...new Set(files.map(f => f.type))].join(", "),
+      sessionId: currentSessionId || "",
+    });
+
     const newTasks = files.map((file) => {
       const task: BatchTask = {
         id: crypto.randomUUID(),
@@ -486,11 +528,32 @@ export default function App() {
           items: Array.isArray(extractedPayload.items) ? extractedPayload.items : [],
         },
       });
+
+      pendo.track("receipt_extraction_completed", {
+        fileName: task.fileName,
+        fileSize: task.fileSize,
+        fileType: task.fileType,
+        vendor: extractedPayload.vendor || "Unknown Vendor",
+        amount: typeof extractedPayload.amount === "number" ? extractedPayload.amount : 0,
+        tax: typeof extractedPayload.tax === "number" ? extractedPayload.tax : 0,
+        currency: extractedPayload.currency || "USD",
+        category: extractedPayload.category || "Other",
+        itemCount: Array.isArray(extractedPayload.items) ? extractedPayload.items.length : 0,
+        sessionId: currentSessionId || "",
+      });
     } catch (err: any) {
       console.error(`AI Extraction error for ${task.fileName}:`, err);
       updateTaskStatus(task.id, {
         status: "failed",
         error: err?.message || "Failed to parse receipt text content.",
+      });
+
+      pendo.track("receipt_extraction_failed", {
+        fileName: task.fileName,
+        fileSize: task.fileSize,
+        fileType: task.fileType,
+        errorMessage: (err?.message || "Unknown error").substring(0, 100),
+        sessionId: currentSessionId || "",
       });
     }
   };
@@ -511,6 +574,14 @@ export default function App() {
   const handleRetryTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
+
+    pendo.track("receipt_extraction_retried", {
+      fileName: task.fileName,
+      fileType: task.fileType,
+      taskId: task.id,
+      hasCachedData: !!task.base64Data,
+      sessionId: currentSessionId || "",
+    });
 
     // We can't easily re-access the file stream object immediately,
     // so we re-fetch from the stored base64 image or prompt failure
@@ -560,10 +631,31 @@ export default function App() {
           items: Array.isArray(extractedPayload.items) ? extractedPayload.items : [],
         },
       });
+
+      pendo.track("receipt_extraction_completed", {
+        fileName: task.fileName,
+        fileSize: task.fileSize,
+        fileType: task.fileType,
+        vendor: extractedPayload.vendor || "Unknown Vendor",
+        amount: typeof extractedPayload.amount === "number" ? extractedPayload.amount : 0,
+        tax: typeof extractedPayload.tax === "number" ? extractedPayload.tax : 0,
+        currency: extractedPayload.currency || "USD",
+        category: extractedPayload.category || "Other",
+        itemCount: Array.isArray(extractedPayload.items) ? extractedPayload.items.length : 0,
+        sessionId: currentSessionId || "",
+      });
     } catch (err: any) {
       updateTaskStatus(task.id, {
         status: "failed",
         error: err?.message || "Failed to retry parsing.",
+      });
+
+      pendo.track("receipt_extraction_failed", {
+        fileName: task.fileName,
+        fileSize: task.fileSize,
+        fileType: task.fileType,
+        errorMessage: (err?.message || "Unknown error").substring(0, 100),
+        sessionId: currentSessionId || "",
       });
     }
   };
@@ -575,6 +667,18 @@ export default function App() {
 
     // Save to storage
     await saveStateToStorage(updatedLedger, security, passcode);
+
+    pendo.track("receipt_verified_and_saved", {
+      vendor: finalData.vendor,
+      amount: finalData.amount,
+      tax: finalData.tax,
+      currency: finalData.currency,
+      category: finalData.category,
+      date: finalData.date,
+      itemCount: finalData.items?.length || 0,
+      receiptId: finalData.id,
+      sessionId: currentSessionId || "",
+    });
 
     // Clear verification views
     handleRemoveTask(taskId);
@@ -597,6 +701,11 @@ export default function App() {
 
   // Manual delete single item
   const handleDeleteReceipt = async (id: string) => {
+    pendo.track("receipt_deleted", {
+      receiptId: id,
+      remainingReceiptCount: receipts.length - 1,
+      sessionId: currentSessionId || "",
+    });
     const filtered = receipts.filter((r) => r.id !== id);
     setReceipts(filtered);
     await saveStateToStorage(filtered, security, passcode);
@@ -618,6 +727,12 @@ export default function App() {
   const handleWipeData = async () => {
     const confirmWipe = window.confirm("⚠️ Are you absolutely sure you want to securely shred all sessions & local storage caches? This cannot be undone.");
     if (!confirmWipe) return;
+
+    pendo.track("all_data_wiped", {
+      receiptCount: receipts.length,
+      sessionCount: sessions.length,
+      hadEncryptionEnabled: security.encryptStorage,
+    });
 
     setReceipts([]);
     setTasks([]);
@@ -798,6 +913,11 @@ export default function App() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                pendo.track("workspace_deleted", {
+                                  sessionId: session.id,
+                                  sessionName: session.name,
+                                  remainingWorkspaceCount: sessions.length - 1,
+                                });
                                 const updated = sessions.filter(s => s.id !== session.id);
                                 setSessions(updated);
                                 localStorage.setItem("nf_sessions", JSON.stringify(updated));
@@ -885,6 +1005,13 @@ export default function App() {
                     const updated = [...sessions, newSessionObj];
                     setSessions(updated);
                     localStorage.setItem("nf_sessions", JSON.stringify(updated));
+
+                    pendo.track("workspace_created", {
+                      sessionName: trimmed,
+                      sessionId: newId,
+                      totalWorkspaceCount: updated.length,
+                    });
+
                     setNewSessionName("");
                     setIsCreatingSession(false);
                     setCurrentSessionId(newId);
