@@ -77,6 +77,17 @@ export default function DropZone({
     };
   }, [isCameraActive, cameraStream]);
 
+  // Lock body scroll when camera is active for an immersive, mobile-native experience
+  useEffect(() => {
+    if (isCameraActive) {
+      const originalStyle = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isCameraActive]);
+
   const startCamera = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCameraActive(true);
@@ -212,16 +223,78 @@ export default function DropZone({
         </div>
       )}
 
-      {/* Visual Drag Space / Live Camera Viewfinder */}
+      {/* Full screen Immersive Live Viewfinder modal */}
+      {isCameraActive && (
+        <div 
+          className="fixed inset-0 z-55 bg-black flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Immersive background video stream */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          />
+
+          {/* Styled Live Camera Floating Tag */}
+          <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-slate-950/70 backdrop-blur-md rounded-full border border-white/10 text-white text-[10px] font-bold tracking-widest uppercase z-20 select-none shadow-lg">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+            <span className="font-sans">LIVE CAM</span>
+          </div>
+
+          {/* Minimalist Floating 'X' Close button */}
+          <button
+            type="button"
+            onClick={stopCamera}
+            className="absolute top-4 right-4 p-2.5 sm:p-3 bg-red-650/80 dark:bg-rose-700/85 hover:bg-red-750 hover:scale-105 active:scale-95 text-white rounded-full transition-all cursor-pointer z-30 shadow-xl border border-white/15 flex items-center justify-center animate-in zoom-in-75 duration-200"
+            title="Close Camera"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
+          </button>
+
+          {/* Guideline Overlay Frame with Corner Hooks */}
+          <div className="absolute inset-6 sm:inset-16 md:inset-24 border border-dashed border-white/20 rounded-2xl pointer-events-none flex flex-col items-center justify-between p-6 z-10">
+            {/* Brackets */}
+            <div className="absolute top-4 left-4 w-6 h-6 border-t-[3px] border-l-[3px] border-[#00A3FF]"></div>
+            <div className="absolute top-4 right-4 w-6 h-6 border-t-[3px] border-r-[3px] border-[#00A3FF]"></div>
+            <div className="absolute bottom-4 left-4 w-6 h-6 border-b-[3px] border-l-[3px] border-[#00A3FF]"></div>
+            <div className="absolute bottom-4 right-4 w-6 h-6 border-b-[3px] border-r-[3px] border-[#00A3FF]"></div>
+
+            <div className="mt-auto text-center px-4">
+              <span className="bg-slate-950/70 backdrop-blur-md text-white border border-white/10 text-[10px] md:text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full shadow-lg select-none">
+                Align entire receipt inside box
+              </span>
+            </div>
+          </div>
+
+          {/* Floating Shutter Button Bottom Overlay */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center select-none">
+            <button
+              type="button"
+              onClick={capturePhoto}
+              className="group/shutter relative flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[5px] border-white/90 bg-transparent hover:scale-105 active:scale-90 transition-all cursor-pointer shadow-all-glow"
+              title="Capture receipt photo"
+            >
+              {/* Inner capture core circle */}
+              <div className="w-11 h-11 sm:w-14 sm:h-14 bg-white hover:bg-slate-100 rounded-full transition-colors" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Visual Drag Space */}
       <div
-        onDragOver={isCameraActive ? undefined : handleDragOver}
-        onDragLeave={isCameraActive ? undefined : handleDragLeave}
-        onDrop={isCameraActive ? undefined : handleDrop}
-        onClick={isCameraActive ? undefined : triggerInputSelect}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={triggerInputSelect}
         className={`group relative border-2 border-dashed rounded-2xl p-10 md:p-14 text-center transition-all duration-300 ${
-          isCameraActive
-            ? "border-[#00A3FF]/40 bg-slate-50/20 dark:bg-[#090f1d]/20 cursor-default"
-            : isDragOver
+          isDragOver
             ? "border-[#00A3FF] bg-[#00A3FF]/5 scale-[0.99] shadow-xl cursor-pointer"
             : "border-slate-300 dark:border-[#1e2a3e] bg-white dark:bg-[#0b1220]/72 hover:border-[#00A3FF] dark:hover:border-[#00A3FF]/80 cursor-pointer hover:shadow-lg dark:hover:bg-[#0f192b]/80"
         }`}
@@ -238,102 +311,48 @@ export default function DropZone({
         {/* Visual glow element behind the dropzone */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-48 h-48 bg-[#00A3FF]/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none duration-700"></div>
 
-        {isCameraActive ? (
-          <div className="flex flex-col items-center justify-center space-y-5 w-full max-w-lg mx-auto relative z-10" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-[#00A3FF] font-sans select-none flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-              <Camera className="w-4 h-4 text-red-500 shrink-0" /> Camera Live Viewfinder
-            </h3>
+        <div className="flex flex-col items-center justify-center space-y-6 py-4 relative z-10">
+          {/* Styled centered Upload Icon in Cyan matching mockup */}
+          <div className="w-20 h-20 bg-[#00A3FF]/5 dark:bg-[#00A3FF]/10 rounded-2xl flex items-center justify-center border border-[#00A3FF]/25 group-hover:bg-[#00A3FF]/15 group-hover:scale-105 transition-all duration-300">
+            <UploadCloud className="w-10 h-10 text-[#00A3FF] drop-shadow-[0_2px_8px_rgba(0,163,255,0.4)]" />
+          </div>
 
-            {/* Viewfinder Wrapper */}
-            <div className="relative w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              {/* Receipt Guideline Grid Box Overlay */}
-              <div className="absolute inset-6 border border-dashed border-white/40 rounded-xl pointer-events-none flex items-center justify-center">
-                <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-[#00A3FF]"></div>
-                <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-[#00A3FF]"></div>
-                <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-[#00A3FF]"></div>
-                <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-[#00A3FF]"></div>
-                <span className="text-[10px] text-white bg-slate-950/80 uppercase font-sans font-bold tracking-widest px-3 py-1.5 rounded-full border border-slate-800 shadow-lg select-none">
-                  Align receipt inside guidelines
-                </span>
-              </div>
-            </div>
-
-            {/* Camera Controls Bar */}
-            <div className="flex items-center justify-between w-full pt-1 shrink-0 select-none px-2">
+          <div className="space-y-2 text-center max-w-sm">
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+              Drag & drop your receipt or <span className="text-[#00A3FF] cursor-pointer hover:underline transition-all font-extrabold">browse</span>
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 select-none font-medium">
+              Supports PNG, JPG, JPEG
+            </p>
+            
+            {/* Optional Quick Camera/File triggers */}
+            <div className="flex items-center justify-center gap-3 pt-4">
               <button
                 type="button"
-                onClick={stopCamera}
-                className="px-4 py-2 border border-slate-350 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl cursor-pointer transition-all active:scale-95"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerInputSelect();
+                }}
+                className="px-4 py-2 bg-slate-950 dark:bg-[#1a2333] hover:bg-slate-900 dark:hover:bg-[#253247] border border-transparent dark:border-slate-800 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2 active:scale-95"
               >
-                Close Camera
+                <UploadCloud className="w-4 h-4 text-[#00A3FF]" />
+                Select File
               </button>
-
               <button
                 type="button"
-                onClick={capturePhoto}
-                className="group/shutter relative flex items-center justify-center w-14 h-14 rounded-full border-4 border-white dark:border-slate-900 bg-blue-600 hover:bg-blue-700 shadow-xl ring-4 ring-blue-500/20 hover:ring-blue-500/40 active:scale-90 transition-all cursor-pointer"
-                title="Capture receipt photo"
+                onClick={startCamera}
+                className="px-4 py-2 bg-blue-500/5 hover:bg-blue-500/10 dark:bg-[#0d1624] dark:hover:bg-[#121f33] border border-blue-500/10 dark:border-blue-500/20 text-[#00A3FF] text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all flex items-center gap-2 active:scale-95"
               >
-                <div className="w-5 h-5 bg-white rounded-full group-hover/shutter:scale-95 transition-transform" />
+                <Camera className="w-4 h-4 text-[#00A3FF]" />
+                Use Camera
               </button>
-
-              <div className="w-[100px] text-slate-400 text-[10px] text-right font-mono self-center select-none hidden sm:block">
-                Capture Stream Match
-              </div>
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center space-y-6 py-4 relative z-10">
-            {/* Styled centered Upload Icon in Cyan matching mockup */}
-            <div className="w-20 h-20 bg-[#00A3FF]/5 dark:bg-[#00A3FF]/10 rounded-2xl flex items-center justify-center border border-[#00A3FF]/25 group-hover:bg-[#00A3FF]/15 group-hover:scale-105 transition-all duration-300">
-              <UploadCloud className="w-10 h-10 text-[#00A3FF] drop-shadow-[0_2px_8px_rgba(0,163,255,0.4)]" />
-            </div>
 
-            <div className="space-y-2 text-center max-w-sm">
-              <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">
-                Drag & drop your receipt or <span className="text-[#00A3FF] cursor-pointer hover:underline transition-all font-extrabold">browse</span>
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 select-none font-medium">
-                Supports PNG, JPG, JPEG
-              </p>
-              
-              {/* Optional Quick Camera/File triggers */}
-              <div className="flex items-center justify-center gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    triggerInputSelect();
-                  }}
-                  className="px-4 py-2 bg-slate-950 dark:bg-[#1a2333] hover:bg-slate-900 dark:hover:bg-[#253247] border border-transparent dark:border-slate-800 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2 active:scale-95"
-                >
-                  <UploadCloud className="w-4 h-4 text-[#00A3FF]" />
-                  Select File
-                </button>
-                <button
-                  type="button"
-                  onClick={startCamera}
-                  className="px-4 py-2 bg-blue-500/5 hover:bg-blue-500/10 dark:bg-[#0d1624] dark:hover:bg-[#121f33] border border-blue-500/10 dark:border-blue-500/20 text-[#00A3FF] text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all flex items-center gap-2 active:scale-95"
-                >
-                  <Camera className="w-4 h-4 text-[#00A3FF]" />
-                  Use Camera
-                </button>
-              </div>
-            </div>
-
-            <div id="ocr-badge" className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-500/10 text-xs font-bold select-none shadow-3xs">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-500" /> Stateless AI Extraction Engine
-            </div>
+          <div id="ocr-badge" className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-500/10 text-xs font-bold select-none shadow-3xs">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-500" /> Stateless AI Extraction Engine
           </div>
-        )}
+        </div>
       </div>
 
       {/* Ongoing Batch Grid Queue */}
