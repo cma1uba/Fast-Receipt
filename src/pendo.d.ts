@@ -1,3 +1,1 @@
-declare namespace pendo {
-  function track(eventName: string, properties?: Record<string, unknown>): void;
-}
+declare var pendo: any;
