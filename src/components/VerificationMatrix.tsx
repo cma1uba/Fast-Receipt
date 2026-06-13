@@ -131,6 +131,18 @@ export default function VerificationMatrix({
       items: items,
     };
 
+    pendo.track("receipt_verified_and_saved", {
+      vendor: finalRecord.vendor,
+      amount: finalRecord.amount,
+      tax: finalRecord.tax,
+      currency: finalRecord.currency,
+      category: finalRecord.category,
+      date: finalRecord.date,
+      itemCount: items.length,
+      itemsSum,
+      sumsMatch,
+    });
+
     onSaveVerification(task.id, finalRecord);
   };
 
