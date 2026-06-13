@@ -239,6 +239,7 @@ export default function ReceiptList({
   // Pure Binary-to-Blob Excel & Google Sheets compliant CSV exporter
   const triggerCSVDownload = () => {
     exportReceiptsToCSV(receipts);
+    pendo.track('csv_export_completed', { source: 'active_ledger', recordCount: receipts.length });
   };
 
   const getCategoryColor = (cat: string) => {
