@@ -53,11 +53,6 @@ export default function DropZone({
       }
 
       if (imageFiles.length > 0) {
-        pendo.track("receipt_pasted_from_clipboard", {
-          fileCount: imageFiles.length,
-          fileType: imageFiles.map((f) => f.type).join(", "),
-        });
-
         onAddFiles(imageFiles);
         setShowPasteToast(true);
         setTimeout(() => setShowPasteToast(false), 3000);
@@ -146,13 +141,6 @@ export default function DropZone({
               const file = new File([blob], `Camera-Capture-${Date.now().toString().slice(-6)}.jpg`, {
                 type: "image/jpeg",
               });
-
-              pendo.track("receipt_captured_via_camera", {
-                imageWidth: canvas.width,
-                imageHeight: canvas.height,
-                captureTimestamp: new Date().toISOString(),
-              });
-
               onAddFiles([file]);
               stopCamera();
             }
