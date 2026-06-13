@@ -30,6 +30,12 @@ interface HeaderBannerProps {
   onToggleDark: () => void;
   currentSessionName?: string;
   onSwitchSession?: () => void;
+  pendoEnabled: boolean;
+  pendoApiKey: string;
+  onPendoToggle: (val: boolean) => void;
+  onPendoKeyChange: (val: string) => void;
+  onTriggerPendoTest: () => void;
+  pendoActive: boolean;
 }
 
 export default function HeaderBanner({
@@ -41,6 +47,12 @@ export default function HeaderBanner({
   onToggleDark,
   currentSessionName,
   onSwitchSession,
+  pendoEnabled,
+  pendoApiKey,
+  onPendoToggle,
+  onPendoKeyChange,
+  onTriggerPendoTest,
+  pendoActive,
 }: HeaderBannerProps) {
   const [showConfig, setShowConfig] = React.useState(false);
 
@@ -257,6 +269,73 @@ export default function HeaderBanner({
                         <div className="w-9 h-5 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-350 dark:after:border-slate-700 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
                     </div>
+                  </div>
+                </div>
+
+                {/* 3.5. Pendo Novus AI Analytics Integration */}
+                <div className="space-y-3 bg-slate-50/40 dark:bg-slate-950/10 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80">
+                  <div className="flex items-center gap-2 relative">
+                    <div className="relative group inline-block">
+                      <Info className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 hover:text-[#00A3FF] transition-colors cursor-help shrink-0" />
+                      <div className="absolute bottom-full left-0 mb-2 w-60 sm:w-72 p-2.5 bg-slate-900/95 dark:bg-slate-950 border border-slate-800 dark:border-slate-800/80 text-slate-200 dark:text-slate-300 rounded-xl shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-200 transform scale-95 group-hover:scale-100 z-50 leading-relaxed font-normal normal-case text-[10.5px] text-left">
+                        Stream user engagement, page visits, and feature analytics safely to Pendo Novus AI matching your configured Application Id.
+                        <div className="absolute top-full left-1.5 border-[4px] border-transparent border-t-slate-900/95 dark:border-t-slate-950"></div>
+                      </div>
+                    </div>
+                    <Globe className="w-4 h-4 text-[#00A3FF]" />
+                    <span className="font-bold text-slate-850 dark:text-slate-200 text-xs uppercase tracking-wider">Pendo Novus Analytics</span>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {/* Toggle */}
+                    <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-800 rounded-xl shadow-3xs">
+                      <span className="text-xs font-semibold text-slate-705 dark:text-slate-350">
+                        Enable Analytics
+                      </span>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={pendoEnabled}
+                          onChange={(e) => onPendoToggle(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-350 dark:after:border-slate-700 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+
+                    {/* API Key Input */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-mono">
+                        Pendo API Key / Application ID
+                      </label>
+                      <input
+                        type="text"
+                        value={pendoApiKey}
+                        onChange={(e) => onPendoKeyChange(e.target.value)}
+                        placeholder="e.g. 5d89b14b-2df8-4fb6-7359-8664..."
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-205 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-850 dark:text-slate-200 outline-none focus:ring-2 focus:ring-[#00A3FF]/20 transition-all placeholder:text-slate-350 dark:placeholder:text-slate-700"
+                      />
+                    </div>
+
+                    {/* Status Info Badge */}
+                    <div className="flex items-center justify-between px-1 text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                      <span>Agent Status:</span>
+                      <span className={`font-bold flex items-center gap-1 ${pendoActive ? "text-emerald-500" : "text-amber-500"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${pendoActive ? "bg-emerald-500 animate-ping" : "bg-amber-500"}`}></span>
+                        {pendoActive ? "Connected (Live)" : "Config Pending"}
+                      </span>
+                    </div>
+
+                    {/* Test Trigger Button */}
+                    <button
+                      type="button"
+                      disabled={!pendoActive}
+                      onClick={onTriggerPendoTest}
+                      className="w-full py-2 text-[10px] bg-slate-100 hover:bg-slate-200/85 dark:bg-slate-950 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 px-2.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-bounce" />
+                      Test Event Tracking Ping
+                    </button>
                   </div>
                 </div>
 

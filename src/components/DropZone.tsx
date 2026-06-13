@@ -54,7 +54,6 @@ export default function DropZone({
 
       if (imageFiles.length > 0) {
         onAddFiles(imageFiles);
-        pendo.track('clipboard_receipt_pasted', { fileCount: imageFiles.length });
         setShowPasteToast(true);
         setTimeout(() => setShowPasteToast(false), 3000);
       }
@@ -143,7 +142,6 @@ export default function DropZone({
                 type: "image/jpeg",
               });
               onAddFiles([file]);
-              pendo.track('camera_receipt_captured', {});
               stopCamera();
             }
           },
