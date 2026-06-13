@@ -853,7 +853,15 @@ export default function App() {
               return (
                 <div
                   key={session.id}
-                  onClick={() => setCurrentSessionId(session.id)}
+                  onClick={() => {
+                    pendo.track("workspace_selected", {
+                      sessionId: session.id,
+                      sessionName: session.name,
+                      receiptCount: count,
+                      totalAvailableSessions: sessions.length,
+                    });
+                    setCurrentSessionId(session.id);
+                  }}
                   className="group relative bg-white dark:bg-[#0b1220]/72 backdrop-blur-md border border-slate-205 dark:border-[#1e2a3e]/80 rounded-xl sm:rounded-2xl p-2 sm:p-6.5 shadow-sm hover:shadow-xl hover:border-[#00A3FF] dark:hover:border-[#00A3FF]/85 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[110px] sm:min-h-[190px]"
                 >
                   <div className="flex justify-between items-start">
@@ -1114,7 +1122,18 @@ export default function App() {
 
                         <div className="flex items-center gap-1.5 ml-auto">
                           <button
-                            onClick={() => setViewingSavedLedger(ledger)}
+                            onClick={() => {
+                              pendo.track("saved_ledger_viewed", {
+                                ledgerId: ledger.id,
+                                saveName: ledger.saveName,
+                                sessionName: ledger.sessionName,
+                                receiptCount: ledger.itemCount,
+                                totalAmount: ledger.totalAmount,
+                                totalTax: ledger.totalTax,
+                                daysSinceSaved: Math.floor((Date.now() - new Date(ledger.savedAt).getTime()) / (1000 * 60 * 60 * 24)),
+                              });
+                              setViewingSavedLedger(ledger);
+                            }}
                             className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#1a2333] dark:hover:bg-[#253247] text-slate-705 dark:text-slate-300 rounded-lg font-bold text-[9px] sm:text-[10.5px] transition-colors cursor-pointer"
                           >
                             View
