@@ -7,6 +7,7 @@ import React, { useState, useEffect } from "react";
 import { Download, Send, Search, Trash2, SlidersHorizontal, ArrowUpDown, Filter, RefreshCw, ChevronDown, ChevronUp, ShoppingBag, AlertTriangle, CheckSquare, Square, Calendar, Info, Eye, EyeOff, Save } from "lucide-react";
 import { ReceiptData, ExpenseCategory } from "../types";
 import { exportReceiptsToCSV } from "../utils/csv";
+import { trackPendoEvent } from "../lib/pendo";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
@@ -239,6 +240,11 @@ export default function ReceiptList({
   // Pure Binary-to-Blob Excel & Google Sheets compliant CSV exporter
   const triggerCSVDownload = () => {
     exportReceiptsToCSV(receipts);
+    trackPendoEvent("csv_export_completed", {
+      source: "active_ledger",
+      receiptCount: receipts.length,
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const getCategoryColor = (cat: string) => {
